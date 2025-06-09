@@ -203,19 +203,9 @@ if uploaded_file is not None:
             max_sharpe_idx = np.argmax(all_sharpe_ratios)
             max_utility_idx = np.argmax(all_utility_scores)
             
-            # Debug information with more detail
-            st.write("Debug Information:")
-            st.write(f"Max Sharpe Index: {max_sharpe_idx}")
-            st.write(f"Max Utility Index: {max_utility_idx}")
-            st.write(f"Are indices same? {max_sharpe_idx == max_utility_idx}")
-            
-            # Get the weights and verify they're different
+            # Get the weights
             sharpe_weights = all_weights[max_sharpe_idx]
             utility_weights = all_weights[max_utility_idx]
-            weights_difference = np.abs(sharpe_weights - utility_weights)
-            st.write(f"Maximum weight difference: {np.max(weights_difference):.6f}")
-            st.write(f"Average weight difference: {np.mean(weights_difference):.6f}")
-            st.write(f"Are weights identical? {np.allclose(sharpe_weights, utility_weights)}")
 
             # Create visualization
             fig = plt.figure(figsize=(12, 8))
