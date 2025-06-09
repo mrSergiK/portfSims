@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from portfolio_simulator import AssetUniverse, Constraints, PortfolioGenerator
+from scipy.interpolate import make_interp_spline
 
 st.set_page_config(page_title="Portfolio Simulator", layout="wide")
 
@@ -190,49 +191,48 @@ if uploaded_file is not None:
             plt.scatter(all_stdevs, all_returns, alpha=0.4, color='blue', label='Simulated Portfolios', s=30)
             
             # Calculate efficient frontier
-            # Sort points by standard deviation and find the highest return for each risk level
+            # First, identify the upper boundary points
             indices = np.argsort(all_stdevs)
             sorted_stdevs = all_stdevs[indices]
             sorted_returns = all_returns[indices]
             
-            # Use a rolling maximum to identify the highest return at each risk level
-            frontier_indices = []
-            current_max_return = float('-inf')
-            current_max_idx = None
-            
             # Group points into risk bands and find maximum return in each band
-            risk_tolerance = 0.0001  # Band width for grouping similar risk levels
-            current_std = sorted_stdevs[0]
-            current_points = []
-            
+            risk_bands = np.linspace(min(all_stdevs), max(all_stdevs), 50)  # 50 bands
             frontier_points_x = []
             frontier_points_y = []
             
-            for i in range(len(sorted_stdevs)):
-                if abs(sorted_stdevs[i] - current_std) <= risk_tolerance:
-                    current_points.append((sorted_stdevs[i], sorted_returns[i], i))
-                else:
-                    # Find point with maximum return in current band
-                    if current_points:
-                        max_point = max(current_points, key=lambda x: x[1])
-                        frontier_points_x.append(max_point[0])
-                        frontier_points_y.append(max_point[1])
-                        frontier_indices.append(max_point[2])
-                    
-                    # Reset for next band
-                    current_std = sorted_stdevs[i]
-                    current_points = [(sorted_stdevs[i], sorted_returns[i], i)]
+            for i in range(len(risk_bands)-1):
+                band_mask = (all_stdevs >= risk_bands[i]) & (all_stdevs < risk_bands[i+1])
+                if np.any(band_mask):
+                    max_return_idx = np.argmax(all_returns[band_mask])
+                    band_indices = np.where(band_mask)[0]
+                    frontier_points_x.append(all_stdevs[band_indices[max_return_idx]])
+                    frontier_points_y.append(all_returns[band_indices[max_return_idx]])
             
-            # Add the last group
-            if current_points:
-                max_point = max(current_points, key=lambda x: x[1])
-                frontier_points_x.append(max_point[0])
-                frontier_points_y.append(max_point[1])
-                frontier_indices.append(max_point[2])
+            # Add the last point
+            if all_stdevs[all_stdevs >= risk_bands[-1]].size > 0:
+                max_return_idx = np.argmax(all_returns[all_stdevs >= risk_bands[-1]])
+                last_indices = np.where(all_stdevs >= risk_bands[-1])[0]
+                frontier_points_x.append(all_stdevs[last_indices[max_return_idx]])
+                frontier_points_y.append(all_returns[last_indices[max_return_idx]])
             
-            # Plot the efficient frontier points
-            plt.plot(frontier_points_x, frontier_points_y, 'r--', linewidth=2, label='Efficient Frontier')
-            plt.scatter(frontier_points_x, frontier_points_y, color='red', s=50, alpha=0.5)
+            frontier_points_x = np.array(frontier_points_x)
+            frontier_points_y = np.array(frontier_points_y)
+            
+            # Sort points by x-coordinate
+            sort_idx = np.argsort(frontier_points_x)
+            frontier_points_x = frontier_points_x[sort_idx]
+            frontier_points_y = frontier_points_y[sort_idx]
+            
+            # Create a fine-grained x-axis for the smooth curve
+            x_smooth = np.linspace(frontier_points_x.min(), frontier_points_x.max(), 200)
+            
+            # Fit cubic B-spline
+            spl = make_interp_spline(frontier_points_x, frontier_points_y, k=3)
+            y_smooth = spl(x_smooth)
+            
+            # Plot the smooth efficient frontier
+            plt.plot(x_smooth, y_smooth, 'r-', linewidth=2, label='Efficient Frontier')
             
             # Highlight optimal portfolios
             plt.scatter(all_stdevs[max_sharpe_idx], all_returns[max_sharpe_idx],
