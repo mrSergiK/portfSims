@@ -187,52 +187,34 @@ if uploaded_file is not None:
             # Create visualization
             fig = plt.figure(figsize=(12, 8))
             
-            # Plot all portfolios
-            plt.scatter(all_stdevs, all_returns, alpha=0.4, color='blue', label='Simulated Portfolios', s=30)
+            # Plot all portfolios with hover functionality
+            scatter = plt.scatter(all_stdevs, all_returns, alpha=0.4, color='blue', label='Simulated Portfolios', s=30)
             
-            # Calculate efficient frontier
-            # First, identify the upper boundary points
-            indices = np.argsort(all_stdevs)
-            sorted_stdevs = all_stdevs[indices]
-            sorted_returns = all_returns[indices]
-            
-            # Group points into risk bands and find maximum return in each band
-            risk_bands = np.linspace(min(all_stdevs), max(all_stdevs), 50)  # 50 bands
-            frontier_points_x = []
-            frontier_points_y = []
-            
-            for i in range(len(risk_bands)-1):
-                band_mask = (all_stdevs >= risk_bands[i]) & (all_stdevs < risk_bands[i+1])
-                if np.any(band_mask):
-                    max_return_idx = np.argmax(all_returns[band_mask])
-                    band_indices = np.where(band_mask)[0]
-                    frontier_points_x.append(all_stdevs[band_indices[max_return_idx]])
-                    frontier_points_y.append(all_returns[band_indices[max_return_idx]])
-            
-            # Add the last point
-            if all_stdevs[all_stdevs >= risk_bands[-1]].size > 0:
-                max_return_idx = np.argmax(all_returns[all_stdevs >= risk_bands[-1]])
-                last_indices = np.where(all_stdevs >= risk_bands[-1])[0]
-                frontier_points_x.append(all_stdevs[last_indices[max_return_idx]])
-                frontier_points_y.append(all_returns[last_indices[max_return_idx]])
-            
-            frontier_points_x = np.array(frontier_points_x)
-            frontier_points_y = np.array(frontier_points_y)
-            
-            # Sort points by x-coordinate
-            sort_idx = np.argsort(frontier_points_x)
-            frontier_points_x = frontier_points_x[sort_idx]
-            frontier_points_y = frontier_points_y[sort_idx]
-            
-            # Create a fine-grained x-axis for the smooth curve
-            x_smooth = np.linspace(frontier_points_x.min(), frontier_points_x.max(), 200)
-            
-            # Fit cubic B-spline
-            spl = make_interp_spline(frontier_points_x, frontier_points_y, k=3)
-            y_smooth = spl(x_smooth)
-            
-            # Plot the smooth efficient frontier
-            plt.plot(x_smooth, y_smooth, 'r-', linewidth=2, label='Efficient Frontier')
+            # Add hover annotations
+            annot = plt.annotate("", xy=(0,0), xytext=(10,10), textcoords="offset points",
+                               bbox=dict(boxstyle="round", fc="w", ec="0.5", alpha=0.9),
+                               arrowprops=dict(arrowstyle="->"))
+            annot.set_visible(False)
+
+            def update_annot(ind):
+                pos = scatter.get_offsets()[ind["ind"][0]]
+                annot.xy = pos
+                text = f"Return: {all_returns[ind['ind'][0]]:.2%}\nRisk: {all_stdevs[ind['ind'][0]]:.2%}"
+                annot.set_text(text)
+
+            def hover(event):
+                vis = annot.get_visible()
+                if event.inaxes == plt.gca():
+                    cont, ind = scatter.contains(event)
+                    if cont:
+                        update_annot(ind)
+                        annot.set_visible(True)
+                        fig.canvas.draw_idle()
+                    elif vis:
+                        annot.set_visible(False)
+                        fig.canvas.draw_idle()
+
+            fig.canvas.mpl_connect("motion_notify_event", hover)
             
             # Highlight optimal portfolios
             plt.scatter(all_stdevs[max_sharpe_idx], all_returns[max_sharpe_idx],
