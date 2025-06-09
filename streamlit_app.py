@@ -123,9 +123,29 @@ if uploaded_file is not None:
 
             # Run portfolio simulations
             for i in range(num_portfolios):
-                # Generate portfolio weights
-                weights = generator.generate_portfolio()
-                all_weights.append(weights.copy())  # Make a copy of the weights
+                # Generate portfolio weights and ensure they're unique
+                weights = None
+                max_attempts = 10
+                attempt = 0
+                
+                while attempt < max_attempts:
+                    weights = generator.generate_portfolio()
+                    # Check if these weights are unique compared to previously generated ones
+                    is_unique = True
+                    for prev_weights in all_weights:
+                        if np.allclose(weights, prev_weights):
+                            is_unique = False
+                            break
+                    if is_unique:
+                        break
+                    attempt += 1
+                
+                if weights is None:
+                    st.error("Failed to generate unique portfolio weights")
+                    break
+                
+                # Store a deep copy of the weights
+                all_weights.append(np.array(weights, copy=True))
                 
                 # Get expected returns and standard deviations for the portfolio
                 exp_returns = asset_universe.data['Expected Return'].values
@@ -173,26 +193,28 @@ if uploaded_file is not None:
                     progress_bar.progress(progress)
                     status_text.text(f"Processed {i + 1}/{num_portfolios} portfolios")
 
-            # Convert lists to numpy arrays
+            # Convert lists to numpy arrays (except weights)
             all_returns = np.array(all_returns)
             all_stdevs = np.array(all_stdevs)
             all_sharpe_ratios = np.array(all_sharpe_ratios)
             all_utility_scores = np.array(all_utility_scores)
-            all_weights = [w.copy() for w in all_weights]  # Keep as list of arrays to preserve uniqueness
-
+            
             # Find optimal portfolios
             max_sharpe_idx = np.argmax(all_sharpe_ratios)
             max_utility_idx = np.argmax(all_utility_scores)
             
-            # Debug information
+            # Debug information with more detail
             st.write("Debug Information:")
             st.write(f"Max Sharpe Index: {max_sharpe_idx}")
             st.write(f"Max Utility Index: {max_utility_idx}")
             st.write(f"Are indices same? {max_sharpe_idx == max_utility_idx}")
             
-            # Verify weights are different
-            sharpe_weights = all_weights[max_sharpe_idx].copy()
-            utility_weights = all_weights[max_utility_idx].copy()
+            # Get the weights and verify they're different
+            sharpe_weights = all_weights[max_sharpe_idx]
+            utility_weights = all_weights[max_utility_idx]
+            weights_difference = np.abs(sharpe_weights - utility_weights)
+            st.write(f"Maximum weight difference: {np.max(weights_difference):.6f}")
+            st.write(f"Average weight difference: {np.mean(weights_difference):.6f}")
             st.write(f"Are weights identical? {np.allclose(sharpe_weights, utility_weights)}")
 
             # Create visualization
@@ -287,8 +309,8 @@ if uploaded_file is not None:
                     st.dataframe(portfolio_df)
 
             # Display details for both optimal portfolios
-            display_portfolio_details(col1, "Maximum Sharpe Ratio", max_sharpe_idx, all_weights[max_sharpe_idx])
-            display_portfolio_details(col2, "Maximum Utility", max_utility_idx, all_weights[max_utility_idx])
+            display_portfolio_details(col1, "Maximum Sharpe Ratio", max_sharpe_idx, sharpe_weights)
+            display_portfolio_details(col2, "Maximum Utility", max_utility_idx, utility_weights)
 
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")

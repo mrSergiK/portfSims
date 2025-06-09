@@ -100,9 +100,9 @@ class PortfolioGenerator:
         
         for attempt in range(self.max_attempts):
             try:
-                # Initialize weights
-                weights = np.zeros(n_assets)
-                remaining_weight = 1.0
+                # Initialize weights with random values
+                weights = np.random.random(n_assets)
+                weights = weights / np.sum(weights)
                 
                 # First, allocate minimum weights to asset classes
                 for asset_class, (min_weight, max_weight) in self.constraints.asset_class_ranges.items():
@@ -110,28 +110,33 @@ class PortfolioGenerator:
                     n_class_assets = sum(class_indices)
                     
                     if min_weight > 0 and n_class_assets > 0:
-                        # Allocate minimum weight evenly among assets in this class
-                        weights[class_indices] = min_weight / n_class_assets
-                        remaining_weight -= min_weight
+                        # Allocate minimum weight with some randomness
+                        class_weights = np.random.dirichlet(np.ones(n_class_assets)) * min_weight
+                        weights[class_indices] = class_weights
                 
-                # Calculate remaining allowed weights for each asset class
-                remaining_class_weights = {}
-                for asset_class, (min_weight, max_weight) in self.constraints.asset_class_ranges.items():
-                    class_indices = data['Asset Class'] == asset_class
-                    current_weight = weights[class_indices].sum()
-                    remaining_class_weights[asset_class] = max_weight - current_weight
+                # Calculate remaining weight
+                remaining_weight = 1.0 - np.sum(weights)
                 
-                # Distribute remaining weight proportionally to asset classes
                 if remaining_weight > 0:
-                    total_remaining_allowed = sum(remaining_class_weights.values())
-                    if total_remaining_allowed > 0:
-                        for asset_class, remaining_allowed in remaining_class_weights.items():
-                            if remaining_allowed > 0:
-                                class_indices = data['Asset Class'] == asset_class
-                                additional_weight = (remaining_allowed / total_remaining_allowed) * remaining_weight
-                                n_class_assets = sum(class_indices)
-                                if n_class_assets > 0:
-                                    weights[class_indices] += additional_weight / n_class_assets
+                    # Distribute remaining weight randomly among asset classes
+                    class_weights = {}
+                    for asset_class, (min_weight, max_weight) in self.constraints.asset_class_ranges.items():
+                        class_indices = data['Asset Class'] == asset_class
+                        current_weight = weights[class_indices].sum()
+                        max_additional = max_weight - current_weight
+                        class_weights[asset_class] = max_additional
+                    
+                    # Normalize the remaining weights
+                    total_available = sum(class_weights.values())
+                    if total_available > 0:
+                        scale_factor = remaining_weight / total_available
+                        for asset_class, max_additional in class_weights.items():
+                            class_indices = data['Asset Class'] == asset_class
+                            n_class_assets = sum(class_indices)
+                            if n_class_assets > 0 and max_additional > 0:
+                                # Add random weights within the remaining allocation
+                                additional_weights = np.random.dirichlet(np.ones(n_class_assets)) * (max_additional * scale_factor)
+                                weights[class_indices] += additional_weights
                 
                 # Normalize to ensure sum is exactly 1
                 weights = weights / np.sum(weights)
