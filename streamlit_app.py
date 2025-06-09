@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from portfolio_simulator import AssetUniverse, Constraints
+from portfolio_simulator import AssetUniverse, Constraints, PortfolioGenerator
 
 st.set_page_config(page_title="Portfolio Simulator", layout="wide")
 
@@ -110,6 +110,9 @@ if uploaded_file is not None:
                 utility_lambda=utility_lambda
             )
 
+            # Create portfolio generator
+            generator = PortfolioGenerator(asset_universe, constraints)
+
             # Initialize arrays to store results
             all_weights = []
             all_returns = []
@@ -120,7 +123,7 @@ if uploaded_file is not None:
             # Run portfolio simulations
             for i in range(num_portfolios):
                 # Generate portfolio weights
-                weights = constraints.generate_portfolio(asset_universe)
+                weights = generator.generate_portfolio()
                 all_weights.append(weights)
                 
                 # Get expected returns and standard deviations for the portfolio
