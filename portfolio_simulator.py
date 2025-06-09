@@ -100,45 +100,132 @@ class PortfolioGenerator:
         
         for attempt in range(self.max_attempts):
             try:
-                # Initialize weights with random values
-                weights = np.random.random(n_assets)
+                # Start with sparse random weights (many will be 0)
+                weights = np.zeros(n_assets)
+                # Randomly select ~20-40% of assets to have non-zero weights initially
+                active_assets = np.random.choice(
+                    n_assets,
+                    size=np.random.randint(n_assets // 5, n_assets // 2),
+                    replace=False
+                )
+                weights[active_assets] = np.random.random(len(active_assets))
                 weights = weights / np.sum(weights)
                 
-                # First, allocate minimum weights to asset classes
-                for asset_class, (min_weight, max_weight) in self.constraints.asset_class_ranges.items():
-                    class_indices = data['Asset Class'] == asset_class
-                    n_class_assets = sum(class_indices)
-                    
-                    if min_weight > 0 and n_class_assets > 0:
-                        # Allocate minimum weight with some randomness
-                        class_weights = np.random.dirichlet(np.ones(n_class_assets)) * min_weight
-                        weights[class_indices] = class_weights
+                # Handle constraints in sequence: Asset Class -> Sector -> Region
+                # Asset Class constraints
+                class_adjustments_needed = True
+                max_class_attempts = 50
+                class_attempt = 0
                 
-                # Calculate remaining weight
-                remaining_weight = 1.0 - np.sum(weights)
-                
-                if remaining_weight > 0:
-                    # Distribute remaining weight randomly among asset classes
-                    class_weights = {}
+                while class_adjustments_needed and class_attempt < max_class_attempts:
+                    class_adjustments_needed = False
                     for asset_class, (min_weight, max_weight) in self.constraints.asset_class_ranges.items():
-                        class_indices = data['Asset Class'] == asset_class
-                        current_weight = weights[class_indices].sum()
-                        max_additional = max_weight - current_weight
-                        class_weights[asset_class] = max_additional
+                        indices = data['Asset Class'] == asset_class
+                        current_weight = weights[indices].sum()
+                        
+                        if current_weight < min_weight:
+                            # If below minimum, increase weights
+                            if weights[indices].sum() == 0:
+                                # If no assets selected, randomly select some
+                                class_assets = np.where(indices)[0]
+                                active_assets = np.random.choice(
+                                    class_assets,
+                                    size=max(1, len(class_assets) // 3),
+                                    replace=False
+                                )
+                                weights[active_assets] = min_weight / len(active_assets)
+                            else:
+                                # Scale up existing weights
+                                scale = min_weight / current_weight
+                                weights[indices] *= scale
+                            class_adjustments_needed = True
+                        elif current_weight > max_weight:
+                            # If above maximum, decrease weights
+                            scale = max_weight / current_weight
+                            weights[indices] *= scale
+                            class_adjustments_needed = True
                     
-                    # Normalize the remaining weights
-                    total_available = sum(class_weights.values())
-                    if total_available > 0:
-                        scale_factor = remaining_weight / total_available
-                        for asset_class, max_additional in class_weights.items():
-                            class_indices = data['Asset Class'] == asset_class
-                            n_class_assets = sum(class_indices)
-                            if n_class_assets > 0 and max_additional > 0:
-                                # Add random weights within the remaining allocation
-                                additional_weights = np.random.dirichlet(np.ones(n_class_assets)) * (max_additional * scale_factor)
-                                weights[class_indices] += additional_weights
+                    # Normalize
+                    if class_adjustments_needed:
+                        weights = weights / np.sum(weights)
+                    class_attempt += 1
                 
-                # Normalize to ensure sum is exactly 1
+                if class_attempt >= max_class_attempts:
+                    continue
+                
+                # Sector constraints
+                sector_adjustments_needed = True
+                max_sector_attempts = 50
+                sector_attempt = 0
+                
+                while sector_adjustments_needed and sector_attempt < max_sector_attempts:
+                    sector_adjustments_needed = False
+                    for sector, (min_weight, max_weight) in self.constraints.sector_ranges.items():
+                        indices = data['Sector'] == sector
+                        current_weight = weights[indices].sum()
+                        
+                        if current_weight < min_weight:
+                            if weights[indices].sum() == 0:
+                                sector_assets = np.where(indices)[0]
+                                active_assets = np.random.choice(
+                                    sector_assets,
+                                    size=max(1, len(sector_assets) // 3),
+                                    replace=False
+                                )
+                                weights[active_assets] = min_weight / len(active_assets)
+                            else:
+                                scale = min_weight / current_weight
+                                weights[indices] *= scale
+                            sector_adjustments_needed = True
+                        elif current_weight > max_weight:
+                            scale = max_weight / current_weight
+                            weights[indices] *= scale
+                            sector_adjustments_needed = True
+                    
+                    if sector_adjustments_needed:
+                        weights = weights / np.sum(weights)
+                    sector_attempt += 1
+                
+                if sector_attempt >= max_sector_attempts:
+                    continue
+                
+                # Region constraints
+                region_adjustments_needed = True
+                max_region_attempts = 50
+                region_attempt = 0
+                
+                while region_adjustments_needed and region_attempt < max_region_attempts:
+                    region_adjustments_needed = False
+                    for region, (min_weight, max_weight) in self.constraints.region_ranges.items():
+                        indices = data['Region'] == region
+                        current_weight = weights[indices].sum()
+                        
+                        if current_weight < min_weight:
+                            if weights[indices].sum() == 0:
+                                region_assets = np.where(indices)[0]
+                                active_assets = np.random.choice(
+                                    region_assets,
+                                    size=max(1, len(region_assets) // 3),
+                                    replace=False
+                                )
+                                weights[active_assets] = min_weight / len(active_assets)
+                            else:
+                                scale = min_weight / current_weight
+                                weights[indices] *= scale
+                            region_adjustments_needed = True
+                        elif current_weight > max_weight:
+                            scale = max_weight / current_weight
+                            weights[indices] *= scale
+                            region_adjustments_needed = True
+                    
+                    if region_adjustments_needed:
+                        weights = weights / np.sum(weights)
+                    region_attempt += 1
+                
+                if region_attempt >= max_region_attempts:
+                    continue
+                
+                # Final normalization
                 weights = weights / np.sum(weights)
                 
                 # Verify all constraints
