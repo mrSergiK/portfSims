@@ -10,7 +10,7 @@ st.set_page_config(page_title="Portfolio Simulator", layout="wide")
 st.title("Portfolio Simulation Tool")
 st.markdown("""
 This tool performs portfolio optimization and Monte Carlo simulations based on user-defined asset constraints.
-Upload your asset universe CSV file to get started.
+Upload your asset universe CSV file to get started. [Asset Name, Asset Class, Sector, Region, Expected Return, Standard Deviation]
 """)
 
 # File uploader
