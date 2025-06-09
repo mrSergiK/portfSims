@@ -183,6 +183,17 @@ if uploaded_file is not None:
             # Find optimal portfolios
             max_sharpe_idx = np.argmax(all_sharpe_ratios)
             max_utility_idx = np.argmax(all_utility_scores)
+            
+            # Debug information
+            st.write("Debug Information:")
+            st.write(f"Max Sharpe Index: {max_sharpe_idx}")
+            st.write(f"Max Utility Index: {max_utility_idx}")
+            st.write(f"Are indices same? {max_sharpe_idx == max_utility_idx}")
+            
+            # Verify weights are different
+            sharpe_weights = all_weights[max_sharpe_idx]
+            utility_weights = all_weights[max_utility_idx]
+            st.write(f"Are weights identical? {np.allclose(sharpe_weights, utility_weights)}")
 
             # Create visualization
             fig = plt.figure(figsize=(12, 8))
