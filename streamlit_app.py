@@ -189,24 +189,50 @@ if uploaded_file is not None:
             # Plot all portfolios
             plt.scatter(all_stdevs, all_returns, alpha=0.4, color='blue', label='Simulated Portfolios', s=30)
             
-            # Plot efficient frontier
-            # Sort by standard deviation for smooth curve
-            sort_idx = np.argsort(all_stdevs)
-            sorted_stdevs = all_stdevs[sort_idx]
-            sorted_returns = all_returns[sort_idx]
+            # Calculate efficient frontier
+            # Sort points by standard deviation and find the highest return for each risk level
+            indices = np.argsort(all_stdevs)
+            sorted_stdevs = all_stdevs[indices]
+            sorted_returns = all_returns[indices]
             
-            # Find maximum return for each unique standard deviation
-            unique_stdevs = np.unique(sorted_stdevs)
-            max_returns = [np.max(all_returns[all_stdevs == std]) for std in unique_stdevs]
+            # Use a rolling maximum to identify the highest return at each risk level
+            frontier_indices = []
+            current_max_return = float('-inf')
+            current_max_idx = None
             
-            # Fit a polynomial to create smooth efficient frontier
-            z = np.polyfit(unique_stdevs, max_returns, 4)
-            p = np.poly1d(z)
-            x_frontier = np.linspace(min(unique_stdevs), max(unique_stdevs), 100)
-            y_frontier = p(x_frontier)
+            # Group points into risk bands and find maximum return in each band
+            risk_tolerance = 0.0001  # Band width for grouping similar risk levels
+            current_std = sorted_stdevs[0]
+            current_points = []
             
-            # Plot the efficient frontier
-            plt.plot(x_frontier, y_frontier, 'r--', linewidth=2, label='Efficient Frontier')
+            frontier_points_x = []
+            frontier_points_y = []
+            
+            for i in range(len(sorted_stdevs)):
+                if abs(sorted_stdevs[i] - current_std) <= risk_tolerance:
+                    current_points.append((sorted_stdevs[i], sorted_returns[i], i))
+                else:
+                    # Find point with maximum return in current band
+                    if current_points:
+                        max_point = max(current_points, key=lambda x: x[1])
+                        frontier_points_x.append(max_point[0])
+                        frontier_points_y.append(max_point[1])
+                        frontier_indices.append(max_point[2])
+                    
+                    # Reset for next band
+                    current_std = sorted_stdevs[i]
+                    current_points = [(sorted_stdevs[i], sorted_returns[i], i)]
+            
+            # Add the last group
+            if current_points:
+                max_point = max(current_points, key=lambda x: x[1])
+                frontier_points_x.append(max_point[0])
+                frontier_points_y.append(max_point[1])
+                frontier_indices.append(max_point[2])
+            
+            # Plot the efficient frontier points
+            plt.plot(frontier_points_x, frontier_points_y, 'r--', linewidth=2, label='Efficient Frontier')
+            plt.scatter(frontier_points_x, frontier_points_y, color='red', s=50, alpha=0.5)
             
             # Highlight optimal portfolios
             plt.scatter(all_stdevs[max_sharpe_idx], all_returns[max_sharpe_idx],
