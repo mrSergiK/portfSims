@@ -125,7 +125,7 @@ if uploaded_file is not None:
             for i in range(num_portfolios):
                 # Generate portfolio weights
                 weights = generator.generate_portfolio()
-                all_weights.append(weights)
+                all_weights.append(weights.copy())  # Make a copy of the weights
                 
                 # Get expected returns and standard deviations for the portfolio
                 exp_returns = asset_universe.data['Expected Return'].values
@@ -178,7 +178,7 @@ if uploaded_file is not None:
             all_stdevs = np.array(all_stdevs)
             all_sharpe_ratios = np.array(all_sharpe_ratios)
             all_utility_scores = np.array(all_utility_scores)
-            all_weights = np.array(all_weights)
+            all_weights = [w.copy() for w in all_weights]  # Keep as list of arrays to preserve uniqueness
 
             # Find optimal portfolios
             max_sharpe_idx = np.argmax(all_sharpe_ratios)
@@ -191,8 +191,8 @@ if uploaded_file is not None:
             st.write(f"Are indices same? {max_sharpe_idx == max_utility_idx}")
             
             # Verify weights are different
-            sharpe_weights = all_weights[max_sharpe_idx]
-            utility_weights = all_weights[max_utility_idx]
+            sharpe_weights = all_weights[max_sharpe_idx].copy()
+            utility_weights = all_weights[max_utility_idx].copy()
             st.write(f"Are weights identical? {np.allclose(sharpe_weights, utility_weights)}")
 
             # Create visualization
